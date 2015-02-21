@@ -23,14 +23,13 @@
  * Erick Pires - 25/12/14
  */
 
-
-//TODO: STOP assuming very malloc will succeed
 #include <stdio.h>
 #include <stdlib.h>
 #include <dirent.h>
 #include <string.h>
 #include <fcntl.h>
 #include <ctype.h>
+#include <unistd.h>
 
 #define STUB_STR "???"
 
@@ -42,6 +41,8 @@ typedef struct {
 }file_data;
 
 typedef struct dirent dir_ent;
+
+static char stub_char;
 
 void exit_on_error(char* msg){
 	fprintf(stderr, msg);
@@ -98,13 +99,14 @@ void fill_files_to_output_paths(int argc, char** argv,
 	int i;
 	for(i = 1; i < argc; i++){
 		char* current_argument = argv[i];
-		if(strcmp(current_argument, "-d") == 0 || 
-		   strcmp(current_argument, "-r") == 0){
+		if(current_argument == NULL)
+			continue;
+
+		if(current_argument == &stub_char){
+			//TODO: Find another way to do this.
 			i++;
 			continue;
 		}
-		if(strcmp(current_argument, "-o") == 0)
-			continue;
 
 		(*files_to_output++).file_path = filenames_memory;
 		filenames_memory =  copy_string(filenames_memory, destination_dir);
@@ -237,6 +239,7 @@ void copy_files(file_data* files, int files_count, int replace_mode, char* repla
 	    template_file = fopen(files[i].template_file_path, "r");
 	    output_file = fopen(files[i].file_path, "w");
 
+	    //TODO: modify exit_on_error to use va
 	    if(!template_file){
 	    	fprintf(stderr, "Could not open the file: \"%s\"\n", files[i].template_file_path);
 	    	exit(-1);
@@ -298,13 +301,17 @@ int main(int argc, char** argv){
 	{
 		int i;
 		for(i = 1; i < argc; i++){
+			//TODO: Mark the already used entries with zero so it's easier to test in the secind pass
 			char* current_argument = argv[i];
 			if(strcmp(current_argument, "-o") == 0){
 				can_override_files = 1;
+				argv[i] = NULL;
 				continue;
 			}
 			
 			if(strcmp(current_argument, "-d") == 0){
+				argv[i] = &stub_char;
+
 				i++;
 				if(i >= argc)
 					exit_on_error("You must specify a directory with -d\n");
@@ -314,6 +321,8 @@ int main(int argc, char** argv){
 			}
 
 			if(strcmp(current_argument, "-r") == 0){
+				argv[i] = &stub_char;
+
 				i++;
 				if(i < argc){
 					replace_mode = 1;
