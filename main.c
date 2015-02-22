@@ -42,8 +42,6 @@ typedef struct {
 
 typedef struct dirent dir_ent;
 
-static char stub_char;
-
 void exit_on_error(char* msg){
 	fprintf(stderr, msg);
 	exit(-1);
@@ -101,12 +99,6 @@ void fill_files_to_output_paths(int argc, char** argv,
 		char* current_argument = argv[i];
 		if(current_argument == NULL)
 			continue;
-
-		if(current_argument == &stub_char){
-			//TODO: Find another way to do this.
-			i++;
-			continue;
-		}
 
 		(*files_to_output++).file_path = filenames_memory;
 		filenames_memory =  copy_string(filenames_memory, destination_dir);
@@ -301,7 +293,6 @@ int main(int argc, char** argv){
 	{
 		int i;
 		for(i = 1; i < argc; i++){
-			//TODO: Mark the already used entries with zero so it's easier to test in the secind pass
 			char* current_argument = argv[i];
 			if(strcmp(current_argument, "-o") == 0){
 				can_override_files = 1;
@@ -310,28 +301,33 @@ int main(int argc, char** argv){
 			}
 			
 			if(strcmp(current_argument, "-d") == 0){
-				argv[i] = &stub_char;
-
+				argv[i] = NULL;
 				i++;
+
 				if(i >= argc)
 					exit_on_error("You must specify a directory with -d\n");
 
 				destination_dir = argv[i];
+				argv[i] = NULL;
 				continue;
 			}
 
 			if(strcmp(current_argument, "-r") == 0){
-				argv[i] = &stub_char;
-
+				argv[i] = NULL;
 				i++;
+
 				if(i < argc){
 					replace_mode = 1;
 					replace_str = argv[i];
 				}
 				else
 					replace_mode = -1;
+				
+				argv[i] = NULL;
 				continue;
 			}
+			//TODO: Maybe handle unknown parameters properly
+			
 			//DEFAULT
 			files_to_output_count++;
 			file_names_length += strlen(current_argument) + 1;
