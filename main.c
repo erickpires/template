@@ -8,7 +8,7 @@
  *
  * The program receives a list of filenames as its standard parameters
  * for each of the filenames it search the template directory for a file
- * with the same extension and then makes a copy of this file in the 
+ * with the same extension and then makes a copy of this file in the
  * destination directory.
  *
  * A destination directory can be specified with -d [DIR], otherwise, the
@@ -16,8 +16,8 @@
  * If the destination file already exists, the program aborts with an error
  * message, unless -o is passed as argument.
  * If the template files have the string "???" and -r [STR] is passed as argument
- * the "???" is replaced with STR. If -r is the last argument and STR is omitted, 
- * the default behavior is to replace "???" with the filename in uppercase 
+ * the "???" is replaced with STR. If -r is the last argument and STR is omitted,
+ * the default behavior is to replace "???" with the filename in uppercase
  * with all its non-alphanumeric characters replaced with '_' (for use with C header files).
 
  * Erick Pires - 25/12/14
@@ -30,6 +30,7 @@
 #include <fcntl.h>
 #include <ctype.h>
 #include <unistd.h>
+#include <sys/stat.h>
 
 #define STUB_STR "???"
 
@@ -41,6 +42,7 @@ typedef struct {
 }file_data;
 
 typedef struct dirent dir_ent;
+typedef struct stat stat_buf;
 
 void exit_on_error(char* msg){
 	fprintf(stderr, msg);
@@ -52,7 +54,7 @@ void trim_right(char* str){
 	{
 		int i  = len - 1;
 
-		while( i >= 0 && 
+		while( i >= 0 &&
 			 ( str[i] == '\n' || str[i] == '\t' || str[i] == ' '))
 		{
 			str[i--] = '\0';
@@ -90,8 +92,8 @@ char* copy_string(char* dest, char* src){
 	return dest;
 }
 
-void fill_files_to_output_paths(int argc, char** argv, 
-								file_data* files_to_output, 
+void fill_files_to_output_paths(int argc, char** argv,
+								file_data* files_to_output,
 								char *destination_dir,
 								char* filenames_memory){
 	int i;
@@ -123,7 +125,7 @@ void get_files_extensions(file_data* files_to_output, int files_to_output_count)
 
 }
 
-void get_files_names(file_data* files, int files_count, 
+void get_files_names(file_data* files, int files_count,
 					 int destination_dir_len){
 
 	int i;
@@ -132,7 +134,7 @@ void get_files_names(file_data* files, int files_count,
 }
 
 DIR* get_template_dir(char* template_dir_name_buffer){
-	
+
 	FILE* xdg_result = NULL;
 	//NOTE: Since we only have access to the stdin stream
 	//      The error stream is redirected so we can read it.
@@ -140,7 +142,7 @@ DIR* get_template_dir(char* template_dir_name_buffer){
 
 	if(!xdg_result)
 		exit_on_error("Failed to use popen\n");
-	
+
 	fgets(template_dir_name_buffer, 256, xdg_result);
 
 	pclose(xdg_result);
@@ -165,11 +167,11 @@ void get_template_files(file_data* files, int files_count,
 
 			if(matches_file_format(template_file_dir_ent->d_name, files[i].file_extension)){
 
-				if(template_file_full_path == NULL){	
+				if(template_file_full_path == NULL){
 
 					template_file_full_path = (char*) malloc(
-				    	strlen(template_dir_name) + 
-				    	strlen(template_file_dir_ent->d_name) + 
+				    	strlen(template_dir_name) +
+				    	strlen(template_file_dir_ent->d_name) +
 				    	strlen("/") + 1);
 
 				    if(!template_file_full_path)
@@ -182,7 +184,7 @@ void get_template_files(file_data* files, int files_count,
 
 				files[i].template_file_path = template_file_full_path;
 				completed_files++;
-			
+
 				if(completed_files == files_count)
 					return;
 			}
@@ -221,23 +223,28 @@ char* make_replace_str(char* filename){
 }
 
 void copy_files(file_data* files, int files_count, int replace_mode, char* replace_str){
+	stat_buf stat_buffer;
 	int i;
+
 	for(i = 0; i < files_count; i++){
+		char* template_file_path = files[i].template_file_path;
+		char* output_file_path = files[i].file_path;
+
 		if(replace_mode == -1)
 			replace_str = make_replace_str(files[i].filename);
 
 		FILE* template_file = NULL;
 		FILE* output_file = NULL;
-	    template_file = fopen(files[i].template_file_path, "r");
-	    output_file = fopen(files[i].file_path, "w");
+	    template_file = fopen(template_file_path, "r");
+	    output_file = fopen(output_file_path, "w");
 
 	    //TODO: modify exit_on_error to use va
 	    if(!template_file){
-	    	fprintf(stderr, "Could not open the file: \"%s\"\n", files[i].template_file_path);
+	    	fprintf(stderr, "Could not open the file: \"%s\"\n", template_file_path);
 	    	exit(-1);
 	    }
 	    if(!output_file){
-	    	fprintf(stderr, "Could not open the file: \"%s\"\n", files[i].filename);
+	    	fprintf(stderr, "Could not open the file: \"%s\"\n", output_file_path);
 	    	exit(-1);
 	    }
 
@@ -270,6 +277,22 @@ void copy_files(file_data* files, int files_count, int replace_mode, char* repla
 
 		if(replace_mode == -1)
 			free(replace_str);
+
+	    // Copying mode bits from one file the other
+	    if(stat(template_file_path, &stat_buffer)) {
+	    	fprintf(stderr, "Could not get the mode of %s\n", template_file_path);
+	    	continue;
+	    }
+
+	    mode_t file_mode = stat_buffer.st_mode;
+#if DEBUG
+	    printf("Mode of %s is %o\n", template_file_path, file_mode);
+#endif
+
+	    if(chmod(output_file_path, file_mode)) {
+	    	fprintf(stderr, "Could not set the mode of %s\n", output_file_path);
+	    	continue;
+	    }
 	}
 }
 
@@ -299,7 +322,7 @@ int main(int argc, char** argv){
 				argv[i] = NULL;
 				continue;
 			}
-			
+
 			if(strcmp(current_argument, "-d") == 0){
 				argv[i] = NULL;
 				i++;
@@ -322,12 +345,12 @@ int main(int argc, char** argv){
 				}
 				else
 					replace_mode = -1;
-				
+
 				argv[i] = NULL;
 				continue;
 			}
 			//TODO: Maybe handle unknown parameters properly
-			
+
 			//DEFAULT
 			files_to_output_count++;
 			file_names_length += strlen(current_argument) + 1;
@@ -343,7 +366,7 @@ int main(int argc, char** argv){
 											file_names_length);
 	if(! files_to_output || !filenames_memory)
 		exit_on_error("Failed to allocate memory");
-	
+
 	fill_files_to_output_paths(argc, argv, files_to_output, destination_dir, filenames_memory);
 	get_files_extensions(files_to_output, files_to_output_count);
 	get_files_names(files_to_output, files_to_output_count, destination_dir_len);
