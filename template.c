@@ -49,7 +49,7 @@ void eat_argument(int argc, char** argv, int index, char** dest) {
 	argv[index] = NULL;
 }
 
-void trim_right(char* str){
+inline void trim_right(char* str){
 	int len = strlen(str);
 	{
 		int i  = len - 1;
@@ -62,7 +62,7 @@ void trim_right(char* str){
 	}
 }
 
-int matches_file_format(char* filename, char* file_extension){
+inline int matches_file_format(char* filename, char* file_extension){
 	int end_filename = strlen(filename);
 	int end_file_extension = strlen(file_extension);
 
@@ -82,7 +82,7 @@ int matches_file_format(char* filename, char* file_extension){
 	return 0;
 }
 
-char* copy_string(char* dest, char* src){
+inline char* copy_string(char* dest, char* src){
 	//NOTE: copies all the characters from src to dest and
 	//returns a pointer to last character of dest.
 	while(*src)
@@ -150,8 +150,7 @@ void get_files_extensions(file_data* files_to_output, int files_to_output_count)
 void get_files_names(file_data* files, int files_count,
 					 int destination_dir_len){
 
-	int i;
-	for(i = 0; i < files_count; i++)
+	for(int i = 0; i < files_count; i++)
 		files[i].filename = files[i].file_path + destination_dir_len;
 }
 
@@ -216,8 +215,7 @@ void get_template_files(file_data* files, int files_count,
 	if(files_count != completed_files){
 		fprintf(stderr, "Couldn't find matches for the file(s):\n");
 		{
-			int i;
-			for(i = 0; i < files_count; i++){
+			for(int i = 0; i < files_count; i++){
 				if(files[i].template_file_path == NULL)
 					fprintf(stderr, "  \"%s\"\n", files[i].filename);
 			}
@@ -240,7 +238,7 @@ char* make_replace_str(char* filename){
 	return result;
 }
 
-bool file_exists(char* file_path) {
+inline bool file_exists(char* file_path) {
 	return access(file_path, F_OK) == 0;
 }
 
