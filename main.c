@@ -268,78 +268,85 @@ char* make_replace_str(char* filename){
 	return result;
 }
 
+bool file_exists(char* file_path) {
+	return access(file_path, F_OK) == 0;
+}
+
 void copy_file(file_data* file){
 	stat_buf stat_buffer;
-	{
-		char* template_file_path = file->template_file_path;
-		char* output_file_path = file->file_path;
+	char* template_file_path = file->template_file_path;
+	char* output_file_path = file->file_path;
 
-		if(file->replace == replace_with_name)
-			file->replace_string = make_replace_str(file->filename);
+	if(!file->can_override && file_exists(output_file_path)) {
+		fprintf(stderr, "File: %s already exists.\n", output_file_path);
+		fprintf(stderr, "This file was ignored. To override it, please use '-o'\n");
+		return;
+	}
 
-		FILE* template_file = NULL;
-		FILE* output_file = NULL;
-	    template_file = fopen(template_file_path, "r");
-	    output_file = fopen(output_file_path, "w");
+	if(file->replace == replace_with_name)
+		file->replace_string = make_replace_str(file->filename);
 
-	    //TODO: modify exit_on_error to use va
-	    if(!template_file){
-	    	fprintf(stderr, "Could not open the file: \"%s\"\n", template_file_path);
-	    	exit(-1);
-	    }
-	    if(!output_file){
-	    	fprintf(stderr, "Could not open the file: \"%s\"\n", output_file_path);
-	    	exit(-1);
-	    }
+	FILE* template_file = NULL;
+	FILE* output_file = NULL;
+    template_file = fopen(template_file_path, "r");
+    output_file = fopen(output_file_path, "w");
 
-	    char buffer[1024];
+    //TODO: modify exit_on_error to use va
+    if(!template_file){
+    	fprintf(stderr, "Could not open the file: \"%s\"\n", template_file_path);
+    	exit(-1);
+    }
+    if(!output_file){
+    	fprintf(stderr, "Could not open the file: \"%s\"\n", output_file_path);
+    	exit(-1);
+    }
 
-	    while(!feof(template_file)){
-	    	if(!fgets(buffer, sizeof(buffer), template_file))
-	    		break;
+    char buffer[1024];
 
-	    	if(file->replace != dont_replace){
-	    		//TODO: the case where the line is longer than 1024 character
-	    		//should be handle properly
-	    		char* stub_pos = strstr(buffer, STUB_STR);
-	    		if(!stub_pos)
-	    			fprintf(output_file, "%s", buffer);
-	    		else{
-	    			*stub_pos = '\0';
-	    			fprintf(output_file, "%s", buffer);
-	    			fprintf(output_file, "%s", file->replace_string);
-	    			fprintf(output_file, "%s", stub_pos + strlen(STUB_STR));
-	    		}
+    while(!feof(template_file)){
+    	if(!fgets(buffer, sizeof(buffer), template_file))
+    		break;
 
-	    	}
-	    	else
-				fprintf(output_file, "%s", buffer);
-	    }
+    	if(file->replace != dont_replace){
+    		//TODO: the case where the line is longer than 1024 character
+    		//should be handle properly
+    		char* stub_pos = strstr(buffer, STUB_STR);
+    		if(!stub_pos)
+    			fprintf(output_file, "%s", buffer);
+    		else{
+    			*stub_pos = '\0';
+    			fprintf(output_file, "%s", buffer);
+    			fprintf(output_file, "%s", file->replace_string);
+    			fprintf(output_file, "%s", stub_pos + strlen(STUB_STR));
+    		}
 
-	    fclose(template_file);
-	    fclose(output_file);
+    	}
+    	else
+			fprintf(output_file, "%s", buffer);
+    }
 
-		if(file->replace == replace_with_name)
-			free(file->replace_string);
+    fclose(template_file);
+    fclose(output_file);
 
-	    // Copying mode bits from one file the other
-	    if(stat(template_file_path, &stat_buffer)) {
-	    	// TODO: Replace with the better version of exit_on_error
-	    	fprintf(stderr, "Could not get the mode of %s\n", template_file_path);
-	    	return;
-	    }
+	if(file->replace == replace_with_name)
+		free(file->replace_string);
 
-	    mode_t file_mode = stat_buffer.st_mode;
+    // Copying mode bits from one file the other
+    if(stat(template_file_path, &stat_buffer)) {
+    	// TODO: Replace with the better version of exit_on_error
+    	fprintf(stderr, "Could not get the mode of %s\n", template_file_path);
+    	return;
+    }
+
+    mode_t file_mode = stat_buffer.st_mode;
 #if DEBUG
-	    printf("Mode of %s is %o\n", template_file_path, file_mode);
+    printf("Mode of %s is %o\n", template_file_path, file_mode);
 #endif
 
-	    if(chmod(output_file_path, file_mode)) {
-	    	// TODO: Replace with the better version of exit_on_error
-	    	fprintf(stderr, "Could not set the mode of %s\n", output_file_path);
-	    	return;
-	    }
-	}
+    if(chmod(output_file_path, file_mode)) {
+    	fprintf(stderr, "Could not set the mode of %s\n", output_file_path);
+    	return;
+    }
 }
 
 int main(int argc, char** argv){
@@ -410,20 +417,6 @@ int main(int argc, char** argv){
 
 	get_files_extensions(files_to_output, files_to_output_count);
 	get_files_names(files_to_output, files_to_output_count, destination_dir_len);
-
-	// if(!can_override_files){
-	// 	int i;
-	// 	for(i = 0; i < files_to_output_count; i++){
-	// 		if(access(files_to_output[i].file_path, F_OK) == 0){
-
-	// 			char buffer[128 + MAX_DIR_NAME];
-	// 			sprintf(buffer, "The file: \"%s\" already exists.\n"
-	// 						    "If you really want to override the file, use -o.\n",
-	// 					files_to_output[i].filename);
-	// 			exit_on_error(buffer);
-	// 		}
-	// 	}
-	// }
 
 	get_template_files(files_to_output, files_to_output_count,
 					   template_dir, template_dir_name_buffer);
