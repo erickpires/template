@@ -34,7 +34,20 @@
 
 #define STUB_STR "???"
 
+ typedef int bool;
+ #define FALSE 0
+ #define TRUE 1
+
+typedef enum {
+	dont_replace,
+	replace_with_name,
+	replace_with_argument
+} replace_mode;
+
 typedef struct {
+	bool can_override;
+	replace_mode replace;
+	char* replace_string;
 	char* file_path;
 	char* file_extension;
 	char* filename;
@@ -44,9 +57,20 @@ typedef struct {
 typedef struct dirent dir_ent;
 typedef struct stat stat_buf;
 
+#define starts_with(str,ch) (*str == ch)
+
 void exit_on_error(char* msg){
 	fprintf(stderr, msg);
 	exit(-1);
+}
+
+// TODO: Error messages are terrible. Use something as var_args to improve it.
+void eat_argument(int argc, char** argv, int index, char** dest) {
+	if(index >= argc)
+		exit_on_error("Too few arguments.\n");
+
+	*dest = argv[index];
+	argv[index] = NULL;
 }
 
 void trim_right(char* str){
@@ -96,23 +120,46 @@ void fill_files_to_output_paths(int argc, char** argv,
 								file_data* files_to_output,
 								char *destination_dir,
 								char* filenames_memory){
-	int i;
-	for(i = 1; i < argc; i++){
-		char* current_argument = argv[i];
-		if(current_argument == NULL)
+
+	for(int arg_index = 1; arg_index < argc; arg_index++){
+		char* current_argument = argv[arg_index];
+		if(current_argument == NULL) // This argument has already been eaten
 			continue;
 
-		(*files_to_output++).file_path = filenames_memory;
+		if(starts_with(current_argument, '-')) { // It's an option
+			current_argument++;
+			switch(*current_argument) {
+			case 'o' :
+				files_to_output->can_override = TRUE;
+				break;
+			case 'r' :
+				files_to_output->replace = replace_with_name;
+				break;
+			case 'R' :
+				files_to_output->replace = replace_with_argument;
+				arg_index++;
+				eat_argument(argc, argv, arg_index, &(files_to_output->replace_string));
+				break;
+			case 'd' :
+				break;
+			default :
+				exit_on_error("Unknown option.");
+			}
+			// We processed the option and can advance the loop.
+			continue;
+		}
+
+		files_to_output->file_path = filenames_memory;
 		filenames_memory =  copy_string(filenames_memory, destination_dir);
 		filenames_memory =  copy_string(filenames_memory - 1, "/");
 		filenames_memory =  copy_string(filenames_memory -1, current_argument);
+		files_to_output++;
 	}
 }
 
 void get_files_extensions(file_data* files_to_output, int files_to_output_count){
 
-	int i;
-	for(i = 0; i < files_to_output_count; i++){
+	for(int i = 0; i < files_to_output_count; i++){
 		int pos = strlen(files_to_output[i].file_path) - 1;
 		while(files_to_output[i].file_path[pos] != '.' && pos > 0) //TODO: extremely confusing
 			pos--;
@@ -122,7 +169,6 @@ void get_files_extensions(file_data* files_to_output, int files_to_output_count)
 
 		files_to_output[i].file_extension = files_to_output[i].file_path + pos;
 	}
-
 }
 
 void get_files_names(file_data* files, int files_count,
@@ -222,16 +268,14 @@ char* make_replace_str(char* filename){
 	return result;
 }
 
-void copy_files(file_data* files, int files_count, int replace_mode, char* replace_str){
+void copy_file(file_data* file){
 	stat_buf stat_buffer;
-	int i;
+	{
+		char* template_file_path = file->template_file_path;
+		char* output_file_path = file->file_path;
 
-	for(i = 0; i < files_count; i++){
-		char* template_file_path = files[i].template_file_path;
-		char* output_file_path = files[i].file_path;
-
-		if(replace_mode == -1)
-			replace_str = make_replace_str(files[i].filename);
+		if(file->replace == replace_with_name)
+			file->replace_string = make_replace_str(file->filename);
 
 		FILE* template_file = NULL;
 		FILE* output_file = NULL;
@@ -254,7 +298,7 @@ void copy_files(file_data* files, int files_count, int replace_mode, char* repla
 	    	if(!fgets(buffer, sizeof(buffer), template_file))
 	    		break;
 
-	    	if(replace_mode){
+	    	if(file->replace != dont_replace){
 	    		//TODO: the case where the line is longer than 1024 character
 	    		//should be handle properly
 	    		char* stub_pos = strstr(buffer, STUB_STR);
@@ -263,7 +307,7 @@ void copy_files(file_data* files, int files_count, int replace_mode, char* repla
 	    		else{
 	    			*stub_pos = '\0';
 	    			fprintf(output_file, "%s", buffer);
-	    			fprintf(output_file, "%s", replace_str);
+	    			fprintf(output_file, "%s", file->replace_string);
 	    			fprintf(output_file, "%s", stub_pos + strlen(STUB_STR));
 	    		}
 
@@ -275,13 +319,14 @@ void copy_files(file_data* files, int files_count, int replace_mode, char* repla
 	    fclose(template_file);
 	    fclose(output_file);
 
-		if(replace_mode == -1)
-			free(replace_str);
+		if(file->replace == replace_with_name)
+			free(file->replace_string);
 
 	    // Copying mode bits from one file the other
 	    if(stat(template_file_path, &stat_buffer)) {
+	    	// TODO: Replace with the better version of exit_on_error
 	    	fprintf(stderr, "Could not get the mode of %s\n", template_file_path);
-	    	continue;
+	    	return;
 	    }
 
 	    mode_t file_mode = stat_buffer.st_mode;
@@ -290,8 +335,9 @@ void copy_files(file_data* files, int files_count, int replace_mode, char* repla
 #endif
 
 	    if(chmod(output_file_path, file_mode)) {
+	    	// TODO: Replace with the better version of exit_on_error
 	    	fprintf(stderr, "Could not set the mode of %s\n", output_file_path);
-	    	continue;
+	    	return;
 	    }
 	}
 }
@@ -308,88 +354,84 @@ int main(int argc, char** argv){
 
 	//Begin processing the program arguments
 	int files_to_output_count = 0;
-	int can_override_files = 0;
-	int replace_mode = 0;
 	size_t file_names_length = 0;
 	char* destination_dir = ".";
-	char* replace_str = NULL;
-	{
-		int i;
-		for(i = 1; i < argc; i++){
-			char* current_argument = argv[i];
-			if(strcmp(current_argument, "-o") == 0){
-				can_override_files = 1;
-				argv[i] = NULL;
-				continue;
-			}
 
-			if(strcmp(current_argument, "-d") == 0){
-				argv[i] = NULL;
+	// NOTE: First pass through the arguments.
+	//       A two pass strategy has been chosen so we can allocate the
+	//       right amount of memory
+
+	// C99. Fuck yeah \o/!
+	for(int i = 1; i < argc; i++){
+		char* current_argument = argv[i];
+		if(starts_with(current_argument, '-')) { // It's an option
+			current_argument++;
+			switch(*current_argument) {
+			case 'd' :
 				i++;
-
-				if(i >= argc)
-					exit_on_error("You must specify a directory with -d\n");
-
-				destination_dir = argv[i];
-				argv[i] = NULL;
-				continue;
+				eat_argument(argc, argv, i, &destination_dir);
+				break;
+			case 'o' :
+				break;
+			case 'r' :
+				break;
+			case 'R' :
+				i++; // We have the replace string to process
+				break;
+			default :
+				exit_on_error("unknown option.");
 			}
-
-			if(strcmp(current_argument, "-r") == 0){
-				argv[i] = NULL;
-				i++;
-
-				if(i < argc){
-					replace_mode = 1;
-					replace_str = argv[i];
-				}
-				else
-					replace_mode = -1;
-
-				argv[i] = NULL;
-				continue;
-			}
-			//TODO: Maybe handle unknown parameters properly
-
-			//DEFAULT
-			files_to_output_count++;
-			file_names_length += strlen(current_argument) + 1;
+			// Option processed, can advance loop
+			continue;
 		}
+
+		//Default behavior (Treat as a file)
+		files_to_output_count++;
+		file_names_length += strlen(current_argument) + 1;
 	}
 
+	// Can we access the destination directory?
 	if(access(destination_dir, F_OK))
 		exit_on_error("The destination directory does not exist or\n");
 
+	// Allocating the right amount of memory
 	int destination_dir_len = strlen(destination_dir) + 1;
 	file_data* files_to_output = (file_data*) malloc(files_to_output_count * sizeof(file_data));
 	char* filenames_memory = (char*) malloc(files_to_output_count * destination_dir_len +
 											file_names_length);
+
 	if(! files_to_output || !filenames_memory)
 		exit_on_error("Failed to allocate memory");
+	// All the memory we need was allocated
 
+	// NOTE: Second pass through the arguments happens here
 	fill_files_to_output_paths(argc, argv, files_to_output, destination_dir, filenames_memory);
+
+
 	get_files_extensions(files_to_output, files_to_output_count);
 	get_files_names(files_to_output, files_to_output_count, destination_dir_len);
 
-	if(!can_override_files){
-		int i;
-		for(i = 0; i < files_to_output_count; i++){
-			if(access(files_to_output[i].file_path, F_OK) == 0){
+	// if(!can_override_files){
+	// 	int i;
+	// 	for(i = 0; i < files_to_output_count; i++){
+	// 		if(access(files_to_output[i].file_path, F_OK) == 0){
 
-				char buffer[128 + MAX_DIR_NAME];
-				sprintf(buffer, "The file: \"%s\" already exists.\n"
-							    "If you really want to override the file, use -o.\n",
-						files_to_output[i].filename);
-				exit_on_error(buffer);
-			}
-		}
-	}
+	// 			char buffer[128 + MAX_DIR_NAME];
+	// 			sprintf(buffer, "The file: \"%s\" already exists.\n"
+	// 						    "If you really want to override the file, use -o.\n",
+	// 					files_to_output[i].filename);
+	// 			exit_on_error(buffer);
+	// 		}
+	// 	}
+	// }
 
 	get_template_files(files_to_output, files_to_output_count,
 					   template_dir, template_dir_name_buffer);
 	closedir(template_dir);
 
-	copy_files(files_to_output, files_to_output_count, replace_mode, replace_str);
+	for(int file_index = 0; file_index < files_to_output_count; file_index++) {
+		copy_file(files_to_output + file_index);
+	}
 
     return 0;
 }
