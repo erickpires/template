@@ -31,31 +31,7 @@
 #include <ctype.h>
 #include <unistd.h>
 #include <sys/stat.h>
-
-#define STUB_STR "???"
-
- typedef int bool;
- #define FALSE 0
- #define TRUE 1
-
-typedef enum {
-	dont_replace,
-	replace_with_name,
-	replace_with_argument
-} replace_mode;
-
-typedef struct {
-	bool can_override;
-	replace_mode replace;
-	char* replace_string;
-	char* file_path;
-	char* file_extension;
-	char* filename;
-	char* template_file_path;
-}file_data;
-
-typedef struct dirent dir_ent;
-typedef struct stat stat_buf;
+#include "template.h"
 
 #define starts_with(str,ch) (*str == ch)
 
@@ -118,7 +94,7 @@ char* copy_string(char* dest, char* src){
 
 void fill_files_to_output_paths(int argc, char** argv,
 								file_data* files_to_output,
-								char *destination_dir,
+								char* destination_dir,
 								char* filenames_memory){
 
 	for(int arg_index = 1; arg_index < argc; arg_index++){
@@ -251,19 +227,15 @@ void get_template_files(file_data* files, int files_count,
 }
 
 char* make_replace_str(char* filename){
-	char* result = (char*) malloc(strlen(filename) + 1);
+	char* result = (char*) calloc(strlen(filename) + 1, sizeof(char));
 	if(!result)
 		exit_on_error("Could not allocate memory");
 
-	{
-		int i;
-		for(i = 0; i < strlen(filename); i++){
-			if(isalpha(filename[i]))
-				result[i] = filename[i] & (~0x20);
-			else
-				result[i] = '_';
-		}
-		result[i] = '\0';
+	for(int i = 0; i < strlen(filename); i++){
+		if(isalpha(filename[i]))
+			result[i] = filename[i] & (~0x20);
+		else
+			result[i] = '_';
 	}
 	return result;
 }
