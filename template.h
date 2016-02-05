@@ -28,14 +28,13 @@ typedef struct dirent dir_ent;
 typedef struct stat stat_buf;
 
 void exit_on_error(char*);
-
 void eat_argument(int, char**, int, char**);
 
 void trim_right(char*);
-int matches_file_format(char*, char*);
 char* copy_string(char*, char*);
 char* make_replace_str(char*);
 
+int matches_file_format(char*, char*);
 void fill_files_to_output_paths(int, char**, file_data*, char*,	char*);
 void get_files_extensions(file_data*, int);
 void get_files_names(file_data*, int, int);
