@@ -200,22 +200,28 @@ DIR* get_template_dir(char* template_dir_name_buffer){
 
 void get_template_files(file_data* files, int files_count,
 						DIR* template_dir, char* template_dir_name){
-	int i;
+
 	int completed_files = 0;
 	dir_ent* template_file_dir_ent;
 
-    // TODO(erick): Ignore dir_ent '.' and '..'
-	while((template_file_dir_ent = readdir(template_dir))){
-		char* template_file_full_path = NULL;
-		for(i = 0; i < files_count; i++){
+    while((template_file_dir_ent = readdir(template_dir))){
+        char* template_file_full_path = NULL;
+        char* current_template_filename = template_file_dir_ent->d_name;
 
-			if(matches_file_format(template_file_dir_ent->d_name, files[i].file_extension)){
+    // NOTE(erick): Ignore dir_ent '.' and '..'
+        if(strcmp(current_template_filename, ".") == 0 ||
+           strcmp(current_template_filename, "..") == 0) {
+            continue;
+        }
+
+        for(int i = 0; i < files_count; i++){
+			if(matches_file_format(current_template_filename, files[i].file_extension)){
 
 				if(template_file_full_path == NULL){
 
 					template_file_full_path = (char*) malloc(
 				    	strlen(template_dir_name) +
-				    	strlen(template_file_dir_ent->d_name) +
+				    	strlen(current_template_filename) +
 				    	strlen("/") + 1);
 
 				    if(!template_file_full_path)
@@ -223,7 +229,7 @@ void get_template_files(file_data* files, int files_count,
 
 				    strcpy(template_file_full_path, template_dir_name);
 				    strcat(template_file_full_path, "/");
-				    strcat(template_file_full_path, template_file_dir_ent->d_name);
+				    strcat(template_file_full_path, current_template_filename);
 				}
 
 				files[i].template_file_path = template_file_full_path;
