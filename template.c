@@ -69,11 +69,28 @@ inline int matches_file_format(char* filename, char* file_extension){
 	int index_filename = end_filename - 1;
 	int index_file_extension = end_file_extension - 1;
 
-	while(filename[index_filename] == file_extension[index_file_extension]){
-		if(index_file_extension == 0)
-			return 1;
-		if(index_filename == 0)
-			return 0;
+    // NOTE(erick): The filename has to be bigger than the extension by at
+    // least two characters (one of them been the dot)
+    if(index_filename < index_file_extension + 2) {
+        return 0;
+    }
+
+    // NOTE(erick): We do not support files without extension
+    if(index_file_extension < 0) {
+        return 0;
+    }
+
+	while(filename[index_filename] == file_extension[index_file_extension]) {
+        // NOTE(erick): When the extension ends, we check if we landed on a dot ('.')
+        // in the filename in which case we return true.
+        if(index_file_extension == 0) {
+            if(filename[index_filename - 1] == '.') {
+                return 1;
+            }
+            else {
+                return 0;
+            }
+        }
 
 		index_filename--;
 		index_file_extension--;
@@ -137,8 +154,7 @@ void fill_files_to_output_paths(int argc, char** argv,
 	}
 }
 
-void get_files_extensions(file_data* files_to_output, int files_to_output_count){
-
+void get_files_extensions(file_data* files_to_output, int files_to_output_count) {
 	for(int i = 0; i < files_to_output_count; i++){
 		if(files_to_output[i].file_extension == NULL) {
 			int pos = strlen(files_to_output[i].file_path) - 1;
@@ -148,7 +164,7 @@ void get_files_extensions(file_data* files_to_output, int files_to_output_count)
 			if(pos == 0)
 				exit_on_error("You must specify an extension.\n");
 
-			files_to_output[i].file_extension = files_to_output[i].file_path + pos;
+			files_to_output[i].file_extension = files_to_output[i].file_path + pos + 1;
 		}
 	}
 }
@@ -188,6 +204,7 @@ void get_template_files(file_data* files, int files_count,
 	int completed_files = 0;
 	dir_ent* template_file_dir_ent;
 
+    // TODO(erick): Ignore dir_ent '.' and '..'
 	while((template_file_dir_ent = readdir(template_dir))){
 		char* template_file_full_path = NULL;
 		for(i = 0; i < files_count; i++){
