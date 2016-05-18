@@ -111,6 +111,10 @@ void fill_files_to_output_paths(int argc, char** argv,
 			case 'r' :
 				files_to_output->replace = replace_with_name;
 				break;
+			case 'e' :
+				arg_index++;
+				eat_argument(argc, argv, arg_index, &(files_to_output->file_extension));
+				break;
 			case 'R' :
 				files_to_output->replace = replace_with_argument;
 				arg_index++;
@@ -136,14 +140,16 @@ void fill_files_to_output_paths(int argc, char** argv,
 void get_files_extensions(file_data* files_to_output, int files_to_output_count){
 
 	for(int i = 0; i < files_to_output_count; i++){
-		int pos = strlen(files_to_output[i].file_path) - 1;
-		while(files_to_output[i].file_path[pos] != '.' && pos > 0) //TODO: extremely confusing
-			pos--;
+		if(files_to_output[i].file_extension == NULL) {
+			int pos = strlen(files_to_output[i].file_path) - 1;
+			while(files_to_output[i].file_path[pos] != '.' && pos > 0) //TODO: extremely confusing
+				pos--;
 
-		if(pos == 0)
-			exit_on_error("You must specify an extension.\n");
+			if(pos == 0)
+				exit_on_error("You must specify an extension.\n");
 
-		files_to_output[i].file_extension = files_to_output[i].file_path + pos;
+			files_to_output[i].file_extension = files_to_output[i].file_path + pos;
+		}
 	}
 }
 
@@ -338,7 +344,6 @@ int main(int argc, char** argv){
 	//       A two pass strategy has been chosen so we can allocate the
 	//       right amount of memory
 
-	// C99. Fuck yeah \o/!
 	for(int i = 1; i < argc; i++){
 		char* current_argument = argv[i];
 		if(starts_with(current_argument, '-')) { // It's an option
@@ -352,6 +357,7 @@ int main(int argc, char** argv){
 				break;
 			case 'r' :
 				break;
+			case 'e' : // Fallthrough and ignore both the -e and the extension
 			case 'R' :
 				i++; // We have the replace string to process
 				break;
