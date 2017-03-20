@@ -9,9 +9,9 @@
  #define TRUE 1
 
 typedef enum {
-	dont_replace,
-	replace_with_name,
-	replace_with_argument
+	DONT_REPLACE,
+	REPLACE_WITH_NAME,
+	REPLACE_WITH_ARGUMENT
 } replace_mode;
 
 typedef struct {

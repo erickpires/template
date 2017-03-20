@@ -1,15 +1,7 @@
 /* This program is a C implementation of the template script
  * written by Ian Brunelli.
- * It has been developed for learning purposes and to add some
- * features that the original and lazy developer couldn't make.
  *
- * You may do what you want with this code, I don't mind. Also,
- * no warranties are involved.
- *
- * The program receives a list of filenames as its standard parameters
- * for each of the filenames it search the template directory for a file
- * with the same extension and then makes a copy of this file in the
- * destination directory.
+ * Usage:
  *
  * A destination directory can be specified with -d [DIR], otherwise, the
  * current dir will be used.
@@ -69,19 +61,19 @@ inline int matches_file_format(char* filename, char* file_extension){
 	int index_filename = end_filename - 1;
 	int index_file_extension = end_file_extension - 1;
 
-    // NOTE(erick): The filename has to be bigger than the extension by at
-    // least two characters (one of them been the dot)
+    // NOTE(erick): The filename has to be bigger than the extension by
+    // at least two characters (one of them been the dot)
     if(index_filename < index_file_extension + 2) {
         return 0;
     }
 
-    // NOTE(erick): We do not support files without extension
+    // NOTE(erick): We do not support template files without extension
     if(index_file_extension < 0) {
         return 0;
     }
 
 	while(filename[index_filename] == file_extension[index_file_extension]) {
-        // NOTE(erick): When the extension ends, we check if we landed on a dot ('.')
+        // NOTE(erick): When the extension ends, we check if we are on a dot ('.')
         // in the filename in which case we return true.
         if(index_file_extension == 0) {
             if(filename[index_filename - 1] == '.') {
@@ -126,14 +118,14 @@ void fill_files_to_output_paths(int argc, char** argv,
 				files_to_output->can_override = TRUE;
 				break;
 			case 'r' :
-				files_to_output->replace = replace_with_name;
+				files_to_output->replace = REPLACE_WITH_NAME;
 				break;
 			case 'e' :
 				arg_index++;
 				eat_argument(argc, argv, arg_index, &(files_to_output->file_extension));
 				break;
 			case 'R' :
-				files_to_output->replace = replace_with_argument;
+				files_to_output->replace = REPLACE_WITH_ARGUMENT;
 				arg_index++;
 				eat_argument(argc, argv, arg_index, &(files_to_output->replace_string));
 				break;
@@ -208,7 +200,7 @@ void get_template_files(file_data* files, int files_count,
         char* template_file_full_path = NULL;
         char* current_template_filename = template_file_dir_ent->d_name;
 
-    // NOTE(erick): Ignore dir_ent '.' and '..'
+        // NOTE(erick): Ignore dir_ent '.' and '..'
         if(strcmp(current_template_filename, ".") == 0 ||
            strcmp(current_template_filename, "..") == 0) {
             continue;
@@ -282,31 +274,51 @@ void copy_file(file_data* file){
 		return;
 	}
 
-	if(file->replace == replace_with_name)
+	if(file->replace == REPLACE_WITH_NAME) {
 		file->replace_string = make_replace_str(file->filename);
+    }
 
 	FILE* template_file = NULL;
 	FILE* output_file = NULL;
     template_file = fopen(template_file_path, "r");
-    output_file = fopen(output_file_path, "w");
 
-    //TODO: modify exit_on_error to use va
+    //TODO(erick): modify exit_on_error to use va
     if(!template_file){
     	fprintf(stderr, "Could not open the file: \"%s\"\n", template_file_path);
-    	exit(-1);
-    }
-    if(!output_file){
-    	fprintf(stderr, "Could not open the file: \"%s\"\n", output_file_path);
     	exit(-1);
     }
 
     char buffer[1024];
 
-    while(!feof(template_file)){
-    	if(!fgets(buffer, sizeof(buffer), template_file))
-    		break;
+    if(file->replace == DONT_REPLACE) {
+        output_file = fopen(output_file_path, "w");
+        //TODO(erick): modify exit_on_error to use va
+        if(!output_file) {
+            fprintf(stderr, "Could not open the file: \"%s\"\n", output_file_path);
+            exit(-1);
+        }
 
-    	if(file->replace != dont_replace){
+        while(!feof(template_file)) {
+            if(!fgets(buffer, sizeof(buffer), template_file)) {
+                break;
+            }
+
+            fprintf(output_file, "%s", buffer);
+        }
+        fclose(output_file);
+    } else {
+        output_file = fopen(output_file_path, "w");
+        //TODO(erick): modify exit_on_error to use va
+        if(!output_file) {
+            fprintf(stderr, "Could not open the file: \"%s\"\n", output_file_path);
+            exit(-1);
+        }
+
+        while(!feof(template_file)) {
+        	if(!fgets(buffer, sizeof(buffer), template_file)) {
+        		break;
+            }
+
     		//TODO: the case where the line is longer than 1024 character
     		//should be handle properly
     		char* stub_pos = strstr(buffer, STUB_STR);
@@ -318,21 +330,18 @@ void copy_file(file_data* file){
     			fprintf(output_file, "%s", file->replace_string);
     			fprintf(output_file, "%s", stub_pos + strlen(STUB_STR));
     		}
-
     	}
-    	else
-			fprintf(output_file, "%s", buffer);
+        fclose(output_file);
     }
 
     fclose(template_file);
-    fclose(output_file);
 
-	if(file->replace == replace_with_name)
+	if(file->replace == REPLACE_WITH_NAME)
 		free(file->replace_string);
 
-    // Copying mode bits from one file the other
+    // NOTE(erick): Copying mode bits from one file the other
     if(stat(template_file_path, &stat_buffer)) {
-    	// TODO: Replace with the better version of exit_on_error
+    	// TODO(erick): Replace with the better version of exit_on_error
     	fprintf(stderr, "Could not get the mode of %s\n", template_file_path);
     	return;
     }
