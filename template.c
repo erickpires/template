@@ -23,7 +23,9 @@
 #include <ctype.h>
 #include <unistd.h>
 #include <sys/stat.h>
+
 #include "template.h"
+#include "string_buffer.h"
 
 #define starts_with(str,ch) (*str == ch)
 
@@ -263,11 +265,50 @@ inline bool file_exists(char* file_path) {
 	return access(file_path, F_OK) == 0;
 }
 
-void copy_file(file_data* file){
+void copy_without_replacement(char* template_file_path, char* output_file_path) {
+    FILE* template_file = fopen(template_file_path, "rb");
+    //TODO(erick): modify exit_on_error to use va
+    if(!template_file){
+        fprintf(stderr, "Could not open the file: \"%s\"\n", template_file_path);
+        exit(-1);
+    }
+
+    FILE* output_file = fopen(output_file_path, "wb");
+
+    uint8 buffer[BUFFER_SIZE];
+    //TODO(erick): modify exit_on_error to use va
+    if(!output_file) {
+        fprintf(stderr, "Could not open the file: \"%s\"\n", output_file_path);
+        exit(-1);
+    }
+
+    while(TRUE) {
+        size_t n_read = fread(buffer, sizeof(uint8), BUFFER_SIZE, template_file);
+        if(n_read == 0) {
+            break;
+        }
+
+        size_t n_written = fwrite(buffer, sizeof(uint8), n_read, output_file);
+
+        if(n_written != n_read) {
+            fprintf(stderr, "Failed to write the complete input to the output file: \"%s\"\n", output_file_path);
+            exit(-1);
+        }
+    }
+
+    fclose(template_file);
+    fclose(output_file);
+}
+
+void copy_file(file_data* file) {
 	stat_buf stat_buffer;
 	char* template_file_path = file->template_file_path;
 	char* output_file_path = file->file_path;
 
+    // NOTE(erick): We could have a race condition where the file is
+    // create (or modified, renamed, deleted, etc) after this check
+    // and before we actually open the file. It would be safer to
+    // just open the file and then check if we succeed.
 	if(!file->can_override && file_exists(output_file_path)) {
 		fprintf(stderr, "File: %s already exists.\n", output_file_path);
 		fprintf(stderr, "This file was ignored. To override it, please use '-o'\n");
@@ -278,63 +319,41 @@ void copy_file(file_data* file){
 		file->replace_string = make_replace_str(file->filename);
     }
 
-	FILE* template_file = NULL;
-	FILE* output_file = NULL;
-    template_file = fopen(template_file_path, "r");
-
-    //TODO(erick): modify exit_on_error to use va
-    if(!template_file){
-    	fprintf(stderr, "Could not open the file: \"%s\"\n", template_file_path);
-    	exit(-1);
-    }
-
-    char buffer[1024];
-
     if(file->replace == DONT_REPLACE) {
-        output_file = fopen(output_file_path, "w");
-        //TODO(erick): modify exit_on_error to use va
-        if(!output_file) {
-            fprintf(stderr, "Could not open the file: \"%s\"\n", output_file_path);
-            exit(-1);
-        }
-
-        while(!feof(template_file)) {
-            if(!fgets(buffer, sizeof(buffer), template_file)) {
-                break;
-            }
-
-            fprintf(output_file, "%s", buffer);
-        }
-        fclose(output_file);
+        copy_without_replacement(template_file_path, output_file_path);
     } else {
-        output_file = fopen(output_file_path, "w");
+        FILE* template_file = fopen(template_file_path, "r");
+        //TODO(erick): modify exit_on_error to use va
+        if(!template_file){
+            fprintf(stderr, "Could not open the file: \"%s\"\n", template_file_path);
+            exit(-1);
+        }
+
+	   FILE* output_file = fopen(output_file_path, "w");
         //TODO(erick): modify exit_on_error to use va
         if(!output_file) {
             fprintf(stderr, "Could not open the file: \"%s\"\n", output_file_path);
             exit(-1);
         }
 
-        while(!feof(template_file)) {
-        	if(!fgets(buffer, sizeof(buffer), template_file)) {
-        		break;
-            }
+        StringBuffer string_buffer;
+        string_buffer_init(&string_buffer);
 
-    		//TODO: the case where the line is longer than 1024 character
-    		//should be handle properly
-    		char* stub_pos = strstr(buffer, STUB_STR);
+        while(string_buffer_read_line(template_file, &string_buffer)) {
+    		char* stub_pos = strstr(string_buffer.buffer_data, STUB_STR);
     		if(!stub_pos)
-    			fprintf(output_file, "%s", buffer);
+    			fprintf(output_file, "%s\n", string_buffer.buffer_data);
     		else{
     			*stub_pos = '\0';
-    			fprintf(output_file, "%s", buffer);
+    			fprintf(output_file, "%s", string_buffer.buffer_data);
     			fprintf(output_file, "%s", file->replace_string);
-    			fprintf(output_file, "%s", stub_pos + strlen(STUB_STR));
+    			fprintf(output_file, "%s\n", stub_pos + strlen(STUB_STR));
     		}
     	}
+
+        fclose(template_file);
         fclose(output_file);
     }
-
-    fclose(template_file);
 
 	if(file->replace == REPLACE_WITH_NAME)
 		free(file->replace_string);

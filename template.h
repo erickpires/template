@@ -4,9 +4,14 @@
 
 #define STUB_STR "???"
 
- typedef int bool;
- #define FALSE 0
- #define TRUE 1
+#include <stdint.h>
+typedef uint8_t uint8;
+
+typedef int bool;
+#define FALSE 0
+#define TRUE 1
+
+#define BUFFER_SIZE 1024
 
 typedef enum {
 	DONT_REPLACE,
