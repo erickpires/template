@@ -46,6 +46,8 @@ void get_files_names(file_data*, int, int);
 DIR* get_template_dir(char*);
 void get_template_files(file_data*, int, DIR*, char*);
 bool file_exists(char*);
+void copy_without_replacement(char*, char*);
 void copy_file(file_data*);
+bool is_absolute_path(char*);
 
 #endif

@@ -140,10 +140,24 @@ void fill_files_to_output_paths(int argc, char** argv,
 			continue;
 		}
 
-		files_to_output->file_path = filenames_memory;
-		filenames_memory =  copy_string(filenames_memory, destination_dir);
-		filenames_memory =  copy_string(filenames_memory - 1, "/");
-		filenames_memory =  copy_string(filenames_memory -1, current_argument);
+        // Setting the point to the destination
+
+        files_to_output->file_path = filenames_memory;
+
+        char* current_file_path = current_argument;
+        if(!is_absolute_path(current_file_path)) {
+            filenames_memory =  copy_string(filenames_memory, destination_dir);
+            // We return one character to point the '\0' of the last string.
+            filenames_memory--;
+            filenames_memory =  copy_string(filenames_memory, "/");
+            filenames_memory--;
+        }
+
+        // NOTE(erick): If the path is absolute we don't prepend the destination_dir path.
+        // In fact, we could just point the files_to_output->file_path to current_file_path
+        // (without a copy), but making the copy keeps the code more symmetric and less
+        // error prone (someone could write to the argv strings).
+		filenames_memory =  copy_string(filenames_memory, current_argument);
 		files_to_output++;
 	}
 }
@@ -431,8 +445,11 @@ int main(int argc, char** argv){
 	// Allocating the right amount of memory
 	int destination_dir_len = strlen(destination_dir) + 1;
 	file_data* files_to_output = (file_data*) malloc(files_to_output_count * sizeof(file_data));
-	char* filenames_memory = (char*) malloc(files_to_output_count * destination_dir_len +
-											file_names_length);
+
+    // NOTE(erick): If the destination file is absolute we won't concatenate the destination_dir path
+    // which means that we probably we need less memory that we are actually allocating. But whatever!
+    size_t size_to_allocate = files_to_output_count * destination_dir_len + file_names_length;
+	char* filenames_memory = (char*) malloc(size_to_allocate);
 
 	if(! files_to_output || !filenames_memory)
 		exit_on_error("Failed to allocate memory");
@@ -454,4 +471,13 @@ int main(int argc, char** argv){
 	}
 
     return 0;
+}
+
+bool is_absolute_path(char* path) {
+    if(path == NULL) {
+         return FALSE;
+    }
+
+    // NOTE(erick): We only support Unix-like paths i.e. paths starting with '/'
+    return path[0] == '/';
 }
