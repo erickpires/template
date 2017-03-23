@@ -390,7 +390,7 @@ void copy_file(file_data* file) {
     }
 }
 
-int main(int argc, char** argv){
+int main(int argc, char** argv) {
 #define MAX_DIR_NAME (MAXNAMLEN + 1)
 	char template_dir_name_buffer[MAX_DIR_NAME];
 	DIR* template_dir = NULL;
@@ -409,7 +409,7 @@ int main(int argc, char** argv){
 	//       A two pass strategy has been chosen so we can allocate the
 	//       right amount of memory
 
-	for(int i = 1; i < argc; i++){
+	for(int i = 1; i < argc; i++) {
 		char* current_argument = argv[i];
 		if(starts_with(current_argument, '-')) { // It's an option
 			current_argument++;
