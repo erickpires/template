@@ -36,8 +36,9 @@ void exit_on_error(char* msg){
 
 // TODO: Error messages are terrible. Use something as var_args to improve it.
 void eat_argument(int argc, char** argv, int index, char** dest) {
-    if(index >= argc)
+    if(index >= argc) {
         exit_on_error("Too few arguments.\n");
+    }
 
     *dest = argv[index];
     argv[index] = NULL;
@@ -45,18 +46,18 @@ void eat_argument(int argc, char** argv, int index, char** dest) {
 
 inline void trim_right(char* str){
     int len = strlen(str);
-    {
-        int i  = len - 1;
 
-        while( i >= 0 &&
-             ( str[i] == '\n' || str[i] == '\t' || str[i] == ' '))
-        {
-            str[i--] = '\0';
-        }
+    int i  = len - 1;
+
+    while( i >= 0 &&
+           ( str[i] == '\n' ||
+             str[i] == '\t' ||
+             str[i] == ' ')) {
+        str[i--] = '\0';
     }
 }
 
-inline int matches_file_format(char* filename, char* file_extension){
+inline int matches_file_format(char* filename, char* file_extension) {
     int end_filename = strlen(filename);
     int end_file_extension = strlen(file_extension);
 
@@ -80,8 +81,7 @@ inline int matches_file_format(char* filename, char* file_extension){
         if(index_file_extension == 0) {
             if(filename[index_filename - 1] == '.') {
                 return 1;
-            }
-            else {
+            } else {
                 return 0;
             }
         }
@@ -96,8 +96,10 @@ inline int matches_file_format(char* filename, char* file_extension){
 inline char* copy_string(char* dest, char* src){
     //NOTE: copies all the characters from src to dest and
     //returns a pointer to last character of dest.
-    while(*src)
+
+    while(*src) {
         *dest++ = *src++;
+    }
 
     *dest++ = '\0';
     return dest;
@@ -108,7 +110,7 @@ void fill_files_to_output_paths(int argc, char** argv,
                                 char* destination_dir,
                                 char* filenames_memory){
 
-    for(int arg_index = 1; arg_index < argc; arg_index++){
+    for(int arg_index = 1; arg_index < argc; arg_index++) {
         char* current_argument = argv[arg_index];
         if(current_argument == NULL) // This argument has already been eaten
             continue;
@@ -149,7 +151,7 @@ void fill_files_to_output_paths(int argc, char** argv,
             filenames_memory =  copy_string(filenames_memory, destination_dir);
             // We return one character to point the '\0' of the last string.
             filenames_memory--;
-            filenames_memory =  copy_string(filenames_memory, "/");
+            filenames_memory = copy_string(filenames_memory, "/");
             filenames_memory--;
         }
 
@@ -157,7 +159,7 @@ void fill_files_to_output_paths(int argc, char** argv,
         // In fact, we could just point the files_to_output->file_path to current_file_path
         // (without a copy), but making the copy keeps the code more symmetric and less
         // error prone (someone could write to the argv strings).
-        filenames_memory =  copy_string(filenames_memory, current_argument);
+        filenames_memory = copy_string(filenames_memory, current_argument);
         files_to_output++;
     }
 }
@@ -166,11 +168,12 @@ void get_files_extensions(file_data* files_to_output, int files_to_output_count)
     for(int i = 0; i < files_to_output_count; i++){
         if(files_to_output[i].file_extension == NULL) {
             int pos = strlen(files_to_output[i].file_path) - 1;
-            while(files_to_output[i].file_path[pos] != '.' && pos > 0) //TODO: extremely confusing
+            while(files_to_output[i].file_path[pos] != '.' && pos > 0){ //TODO: extremely confusing
                 pos--;
-
-            if(pos == 0)
+            }
+            if(pos == 0) {
                 exit_on_error("You must specify an extension.\n");
+            }
 
             files_to_output[i].file_extension = files_to_output[i].file_path + pos + 1;
         }
@@ -189,8 +192,7 @@ void get_files_names(file_data* files, int files_count) {
         int file_path_len = strlen(current_file->file_path);
 
         if(file_path_len == 0) {
-            fprintf(stderr, "File path can't be empty");
-            exit(1);
+            exit_on_error("File path can't be empty");
         }
         // Loop until a '/' is found or cursor reaches the beginning of
         // the filename. This second condition should not happen as stated
@@ -205,22 +207,24 @@ void get_files_names(file_data* files, int files_count) {
     }
 }
 
-DIR* get_template_dir(char* template_dir_name_buffer){
+DIR* get_template_dir(char* template_dir_name_buffer) {
 
     FILE* xdg_result = NULL;
     //NOTE: Since we only have access to the stdin stream
     //      The error stream is redirected so we can read it.
     xdg_result = popen("xdg-user-dir TEMPLATES 2>&1", "r");
 
-    if(!xdg_result)
+    if(!xdg_result) {
         exit_on_error("Failed to use popen\n");
+    }
 
     fgets(template_dir_name_buffer, 256, xdg_result);
 
     pclose(xdg_result);
 
-    if(strstr(template_dir_name_buffer, "sh:"))
+    if(strstr(template_dir_name_buffer, "sh:")) {
         exit_on_error("Could not execute xdg-user-dir\n");
+    }
 
     trim_right(template_dir_name_buffer); // Remove the last new line
 
@@ -233,7 +237,7 @@ void get_template_files(file_data* files, int files_count,
     int completed_files = 0;
     dir_ent* template_file_dir_ent;
 
-    while((template_file_dir_ent = readdir(template_dir))){
+    while((template_file_dir_ent = readdir(template_dir))) {
         char* template_file_full_path = NULL;
         char* current_template_filename = template_file_dir_ent->d_name;
 
@@ -244,17 +248,19 @@ void get_template_files(file_data* files, int files_count,
         }
 
         for(int i = 0; i < files_count; i++){
-            if(matches_file_format(current_template_filename, files[i].file_extension)){
+            if(matches_file_format(current_template_filename,
+                                   files[i].file_extension)) {
 
-                if(template_file_full_path == NULL){
+                if(template_file_full_path == NULL) {
 
                     template_file_full_path = (char*) malloc(
                         strlen(template_dir_name) +
                         strlen(current_template_filename) +
                         strlen("/") + 1);
 
-                    if(!template_file_full_path)
+                    if(!template_file_full_path) {
                         exit_on_error("Could not allocate memory");
+                    }
 
                     strcpy(template_file_full_path, template_dir_name);
                     strcat(template_file_full_path, "/");
@@ -264,34 +270,38 @@ void get_template_files(file_data* files, int files_count,
                 files[i].template_file_path = template_file_full_path;
                 completed_files++;
 
-                if(completed_files == files_count)
+                if(completed_files == files_count) {
                     return;
+                }
             }
         }
     }
 
-    if(files_count != completed_files){
-        fprintf(stderr, "Couldn't find matches for the file(s):\n");
-        {
-            for(int i = 0; i < files_count; i++){
-                if(files[i].template_file_path == NULL)
-                    fprintf(stderr, "  \"%s\"\n", files[i].filename);
+    if(files_count != completed_files) {
+        fprintf(stderr, "Error:\n");
+
+        for(int i = 0; i < files_count; i++) {
+            if(files[i].template_file_path == NULL) {
+                fprintf(stderr, "\t\"%s\"\n", files[i].filename);
             }
         }
-        exit(-1);
+
+        exit_on_error("Could not find matching templates for the files above");
     }
 }
 
 char* make_replace_str(char* filename){
     char* result = (char*) calloc(strlen(filename) + 1, sizeof(char));
-    if(!result)
+    if(!result) {
         exit_on_error("Could not allocate memory");
+    }
 
-    for(int i = 0; i < strlen(filename); i++){
-        if(isalpha(filename[i]))
+    for(int i = 0; i < strlen(filename); i++) {
+        if(isalpha(filename[i])) {
             result[i] = filename[i] & (~0x20);
-        else
+        } else {
             result[i] = '_';
+        }
     }
     return result;
 }
@@ -303,7 +313,7 @@ inline bool file_exists(char* file_path) {
 void copy_without_replacement(char* template_file_path, char* output_file_path) {
     FILE* template_file = fopen(template_file_path, "rb");
     //TODO(erick): modify exit_on_error to use va
-    if(!template_file){
+    if(!template_file) {
         fprintf(stderr, "Could not open the file: \"%s\"\n", template_file_path);
         exit(-1);
     }
@@ -359,7 +369,7 @@ void copy_file(file_data* file) {
     } else {
         FILE* template_file = fopen(template_file_path, "r");
         //TODO(erick): modify exit_on_error to use va
-        if(!template_file){
+        if(!template_file) {
             fprintf(stderr, "Could not open the file: \"%s\"\n", template_file_path);
             exit(-1);
         }
@@ -376,9 +386,9 @@ void copy_file(file_data* file) {
 
         while(string_buffer_read_line(template_file, &string_buffer)) {
             char* stub_pos = strstr(string_buffer.buffer_data, STUB_STR);
-            if(!stub_pos)
+            if(!stub_pos) {
                 fprintf(output_file, "%s\n", string_buffer.buffer_data);
-            else{
+            } else {
                 *stub_pos = '\0';
                 fprintf(output_file, "%s", string_buffer.buffer_data);
                 fprintf(output_file, "%s", file->replace_string);
@@ -390,8 +400,9 @@ void copy_file(file_data* file) {
         fclose(output_file);
     }
 
-    if(file->replace == REPLACE_WITH_NAME)
+    if(file->replace == REPLACE_WITH_NAME) {
         free(file->replace_string);
+    }
 
     // NOTE(erick): Copying mode bits from one file the other
     if(stat(template_file_path, &stat_buffer)) {
@@ -418,8 +429,9 @@ int main(int argc, char** argv) {
 
     template_dir = get_template_dir(template_dir_name_buffer);
 
-    if(!template_dir)
+    if(!template_dir) {
         exit_on_error("Couldn't open the template directory\n");
+    }
 
     //Begin processing the program arguments
     int files_to_output_count = 0;
@@ -460,24 +472,34 @@ int main(int argc, char** argv) {
     }
 
     // Can we access the destination directory?
-    if(access(destination_dir, F_OK))
+    if(access(destination_dir, F_OK)) {
         exit_on_error("The destination directory does not exist or\n");
+    }
 
     // Allocating the right amount of memory
     int destination_dir_len = strlen(destination_dir) + 1;
-    file_data* files_to_output = (file_data*) malloc(files_to_output_count * sizeof(file_data));
+    file_data* files_to_output = (file_data*) malloc(files_to_output_count
+                                                     * sizeof(file_data));
 
-    // NOTE(erick): If the destination file is absolute we won't concatenate the destination_dir path
-    // which means that we probably we need less memory that we are actually allocating. But whatever!
-    size_t size_to_allocate = files_to_output_count * destination_dir_len + file_names_length;
+    // NOTE(erick): If the destination file is absolute we won't
+    // concatenate the destination_dir path which means that we
+    // probably we need less memory that we are actually allocating.
+    // But whatever!
+    size_t size_to_allocate =
+        files_to_output_count * destination_dir_len + file_names_length;
     char* filenames_memory = (char*) malloc(size_to_allocate);
 
-    if(! files_to_output || !filenames_memory)
+    if(!files_to_output || !filenames_memory) {
         exit_on_error("Failed to allocate memory");
+    }
+
     // All the memory we need was allocated
 
     // NOTE: Second pass through the arguments happens here
-    fill_files_to_output_paths(argc, argv, files_to_output, destination_dir, filenames_memory);
+    fill_files_to_output_paths(argc, argv,
+                               files_to_output,
+                               destination_dir,
+                               filenames_memory);
 
 
     get_files_extensions(files_to_output, files_to_output_count);
@@ -487,7 +509,10 @@ int main(int argc, char** argv) {
                        template_dir, template_dir_name_buffer);
     closedir(template_dir);
 
-    for(int file_index = 0; file_index < files_to_output_count; file_index++) {
+    for(int file_index = 0;
+        file_index < files_to_output_count;
+        file_index++) {
+
         copy_file(files_to_output + file_index);
     }
 
