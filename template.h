@@ -14,19 +14,19 @@ typedef int bool;
 #define BUFFER_SIZE 1024
 
 typedef enum {
-	DONT_REPLACE,
-	REPLACE_WITH_NAME,
-	REPLACE_WITH_ARGUMENT
+    DONT_REPLACE,
+    REPLACE_WITH_NAME,
+    REPLACE_WITH_ARGUMENT
 } replace_mode;
 
 typedef struct {
-	bool can_override;
-	replace_mode replace;
-	char* replace_string;
-	char* file_path;
-	char* file_extension;
-	char* filename;
-	char* template_file_path;
+    bool can_override;
+    replace_mode replace;
+    char* replace_string;
+    char* file_path;
+    char* file_extension;
+    char* filename;
+    char* template_file_path;
 }file_data;
 
 typedef struct dirent dir_ent;
@@ -42,7 +42,7 @@ char* make_replace_str(char*);
 int matches_file_format(char*, char*);
 void fill_files_to_output_paths(int, char**, file_data*, char*,	char*);
 void get_files_extensions(file_data*, int);
-void get_files_names(file_data*, int, int);
+void get_files_names(file_data*, int);
 DIR* get_template_dir(char*);
 void get_template_files(file_data*, int, DIR*, char*);
 bool file_exists(char*);

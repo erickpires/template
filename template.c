@@ -177,8 +177,7 @@ void get_files_extensions(file_data* files_to_output, int files_to_output_count)
     }
 }
 
-void get_files_names(file_data* files, int files_count,
-                     int destination_dir_len) {
+void get_files_names(file_data* files, int files_count) {
     // NOTE(erick): We now support absolute paths, so we can't count on
     // the destination directory been always the same (as we did before).
     // We have to iterate backwards in the file_path until we find a '/'.
@@ -482,7 +481,7 @@ int main(int argc, char** argv) {
 
 
     get_files_extensions(files_to_output, files_to_output_count);
-    get_files_names(files_to_output, files_to_output_count, destination_dir_len);
+    get_files_names(files_to_output, files_to_output_count);
 
     get_template_files(files_to_output, files_to_output_count,
                        template_dir, template_dir_name_buffer);
