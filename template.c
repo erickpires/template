@@ -17,6 +17,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <dirent.h>
 #include <string.h>
 #include <fcntl.h>
@@ -29,15 +30,22 @@
 
 #define starts_with(str,ch) (*str == ch)
 
-void exit_on_error(char* msg){
-    fprintf(stderr, msg);
+void exit_on_error(char* msg, ...) {
+    va_list args;
+    va_start(args, msg);
+
+    vfprintf(stderr, msg, args);
+
+    va_end(args);
     exit(-1);
 }
 
-// TODO: Error messages are terrible. Use something as var_args to improve it.
 void eat_argument(int argc, char** argv, int index, char** dest) {
     if(index >= argc) {
-        exit_on_error("Too few arguments.\n");
+        exit_on_error("Too few arguments."
+                      " Trying to consume argument at position %d\n"
+                      " e.g. after '%s'\n",
+                      index, argv[index - 1]);
     }
 
     *dest = argv[index];
@@ -136,7 +144,7 @@ void fill_files_to_output_paths(int argc, char** argv,
             case 'd' :
                 break;
             default :
-                exit_on_error("Unknown option.");
+                exit_on_error("Unknown option '%c'.\n", *current_argument);
             }
             // We processed the option and can advance the loop.
             continue;
@@ -172,7 +180,8 @@ void get_files_extensions(file_data* files_to_output, int files_to_output_count)
                 pos--;
             }
             if(pos == 0) {
-                exit_on_error("You must specify an extension.\n");
+                exit_on_error("You must specify an extension.\n"
+                              " '%s'\n", files_to_output[i].file_path);
             }
 
             files_to_output[i].file_extension = files_to_output[i].file_path + pos + 1;
@@ -192,7 +201,8 @@ void get_files_names(file_data* files, int files_count) {
         int file_path_len = strlen(current_file->file_path);
 
         if(file_path_len == 0) {
-            exit_on_error("File path can't be empty");
+            exit_on_error("Internal bug: File path can't be empty"
+                          " file_index was: %d\n", file_index);
         }
         // Loop until a '/' is found or cursor reaches the beginning of
         // the filename. This second condition should not happen as stated
@@ -259,7 +269,7 @@ void get_template_files(file_data* files, int files_count,
                         strlen("/") + 1);
 
                     if(!template_file_full_path) {
-                        exit_on_error("Could not allocate memory");
+                        exit_on_error("Could not allocate memory\n");
                     }
 
                     strcpy(template_file_full_path, template_dir_name);
@@ -286,14 +296,14 @@ void get_template_files(file_data* files, int files_count,
             }
         }
 
-        exit_on_error("Could not find matching templates for the files above");
+        exit_on_error("Could not find matching templates for the files above\n");
     }
 }
 
 char* make_replace_str(char* filename){
     char* result = (char*) calloc(strlen(filename) + 1, sizeof(char));
     if(!result) {
-        exit_on_error("Could not allocate memory");
+        exit_on_error("make_replace_str: Could not allocate memory\n");
     }
 
     for(int i = 0; i < strlen(filename); i++) {
@@ -312,19 +322,15 @@ inline bool file_exists(char* file_path) {
 
 void copy_without_replacement(char* template_file_path, char* output_file_path) {
     FILE* template_file = fopen(template_file_path, "rb");
-    //TODO(erick): modify exit_on_error to use va
     if(!template_file) {
-        fprintf(stderr, "Could not open the file: \"%s\"\n", template_file_path);
-        exit(-1);
+        exit_on_error("Could not open the file: \"%s\"\n", template_file_path);
     }
 
     FILE* output_file = fopen(output_file_path, "wb");
 
     uint8 buffer[BUFFER_SIZE];
-    //TODO(erick): modify exit_on_error to use va
     if(!output_file) {
-        fprintf(stderr, "Could not open the file: \"%s\"\n", output_file_path);
-        exit(-1);
+        exit_on_error("Could not open the file: \"%s\"\n", output_file_path);
     }
 
     while(TRUE) {
@@ -336,8 +342,8 @@ void copy_without_replacement(char* template_file_path, char* output_file_path) 
         size_t n_written = fwrite(buffer, sizeof(uint8), n_read, output_file);
 
         if(n_written != n_read) {
-            fprintf(stderr, "Failed to write the complete input to the output file: \"%s\"\n", output_file_path);
-            exit(-1);
+            exit_on_error("Failed to write the complete input to the output file:"
+                          " \"%s\"\n", output_file_path);
         }
     }
 
@@ -368,17 +374,13 @@ void copy_file(file_data* file) {
         copy_without_replacement(template_file_path, output_file_path);
     } else {
         FILE* template_file = fopen(template_file_path, "r");
-        //TODO(erick): modify exit_on_error to use va
         if(!template_file) {
-            fprintf(stderr, "Could not open the file: \"%s\"\n", template_file_path);
-            exit(-1);
+            exit_on_error("Could not open the file: \"%s\"\n", template_file_path);
         }
 
        FILE* output_file = fopen(output_file_path, "w");
-        //TODO(erick): modify exit_on_error to use va
         if(!output_file) {
-            fprintf(stderr, "Could not open the file: \"%s\"\n", output_file_path);
-            exit(-1);
+            exit_on_error("Could not open the file: \"%s\"\n", output_file_path);
         }
 
         StringBuffer string_buffer;
@@ -406,9 +408,7 @@ void copy_file(file_data* file) {
 
     // NOTE(erick): Copying mode bits from one file the other
     if(stat(template_file_path, &stat_buffer)) {
-        // TODO(erick): Replace with the better version of exit_on_error
-        fprintf(stderr, "Could not get the mode of %s\n", template_file_path);
-        return;
+        exit_on_error("Could not get the mode of %s\n", template_file_path);
     }
 
     mode_t file_mode = stat_buffer.st_mode;
@@ -430,7 +430,8 @@ int main(int argc, char** argv) {
     template_dir = get_template_dir(template_dir_name_buffer);
 
     if(!template_dir) {
-        exit_on_error("Couldn't open the template directory\n");
+        exit_on_error("Couldn't open the template directory\n"
+                      " '%s'", template_dir_name_buffer);
     }
 
     //Begin processing the program arguments
@@ -460,7 +461,7 @@ int main(int argc, char** argv) {
                 i++; // We have the replace string to process
                 break;
             default :
-                exit_on_error("unknown option.");
+                exit_on_error("Unknown option '%c'.\n", *current_argument);
             }
             // Option processed, can advance loop
             continue;
@@ -473,7 +474,8 @@ int main(int argc, char** argv) {
 
     // Can we access the destination directory?
     if(access(destination_dir, F_OK)) {
-        exit_on_error("The destination directory does not exist or\n");
+        exit_on_error("The destination directory does not exist\n"
+                      " '%s'\n", destination_dir);
     }
 
     // Allocating the right amount of memory
@@ -490,7 +492,7 @@ int main(int argc, char** argv) {
     char* filenames_memory = (char*) malloc(size_to_allocate);
 
     if(!files_to_output || !filenames_memory) {
-        exit_on_error("Failed to allocate memory");
+        exit_on_error("Failed to allocate memory\n");
     }
 
     // All the memory we need was allocated
@@ -519,7 +521,7 @@ int main(int argc, char** argv) {
     return 0;
 }
 
-bool is_absolute_path(char* path) {
+inline bool is_absolute_path(char* path) {
     if(path == NULL) {
          return FALSE;
     }

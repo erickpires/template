@@ -32,9 +32,9 @@ typedef struct {
 typedef struct dirent dir_ent;
 typedef struct stat stat_buf;
 
-void exit_on_error(char*);
-void eat_argument(int, char**, int, char**);
 
+void eat_argument(int, char**, int, char**);
+void exit_on_error(char*, ...);
 void trim_right(char*);
 char* copy_string(char*, char*);
 char* make_replace_str(char*);
